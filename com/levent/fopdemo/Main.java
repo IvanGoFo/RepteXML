@@ -1,49 +1,72 @@
 package com.levent.fopdemo;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import java.io.OutputStream;
 
-public class Main {
+import javax.xml.transform.Result;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.sax.SAXResult;
+import javax.xml.transform.stream.StreamSource;
 
-    public static void main(String[] args) {
+import org.apache.fop.apps.FOPException;
+import org.apache.fop.apps.FOUserAgent;
+import org.apache.fop.apps.Fop;
+import org.apache.fop.apps.FopFactory;
+import org.apache.fop.apps.MimeConstants;
+
+public class Main
+{
+    public static final String RESOURCES_DIR;
+    public static final String OUTPUT_DIR;
+
+    static {
+        RESOURCES_DIR = "src//main//resources//";
+        OUTPUT_DIR = "src//main//resources//output//";
+    }
+
+    public static void main( String[] args )
+    {
         try {
-            // Leer el archivo XML usando JAXB
-            JAXBContext jaxbContext = JAXBContext.newInstance(YourXMLClass.class);
-            Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
-            YourXMLClass data = (YourXMLClass) jaxbUnmarshaller.unmarshal(new FileInputStream("archivo.xml"));
-
-            // Crear documento PDF
-            PDDocument document = new PDDocument();
-            PDPage page = new PDPage();
-            document.addPage(page);
-
-            // Escribir datos del XML en el PDF
-            PDPageContentStream contentStream = new PDPageContentStream(document, page);
-            contentStream.setFont(PDType1Font.HELVETICA, 12);
-            contentStream.beginText();
-            contentStream.newLineAtOffset(100, 700);
-            contentStream.showText("Datos del XML:");
-            contentStream.newLine();
-            contentStream.showText(data.toString()); // Ajusta esto según la estructura de tu XML
-            contentStream.endText();
-            contentStream.close();
-
-            // Guardar el PDF
-            document.save("archivo.pdf");
-            document.close();
-
-            System.out.println("PDF generado correctamente.");
-        } catch (JAXBException | IOException e) {
+            convertToPDF();
+        } catch (FOPException | IOException | TransformerException e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void convertToPDF() throws IOException, FOPException, TransformerException {
+        // the XSL FO file
+        File xsltFile = new File(RESOURCES_DIR + "//template.xsl");
+        // the XML file which provides the input
+        StreamSource xmlSource = new StreamSource(new File(RESOURCES_DIR + "//data.xml"));
+        // create an instance of fop factory
+        FopFactory fopFactory = FopFactory.newInstance(new File(".").toURI());
+        // a user agent is needed for transformation
+        FOUserAgent foUserAgent = fopFactory.newFOUserAgent();
+        // Setup output
+        OutputStream out;
+        out = new java.io.FileOutputStream(OUTPUT_DIR + "//output.pdf");
+
+        try {
+            // Construct fop with desired output format
+            Fop fop = fopFactory.newFop(MimeConstants.MIME_PDF, foUserAgent, out);
+
+            // Setup XSLT
+            TransformerFactory factory = TransformerFactory.newInstance();
+            Transformer transformer = factory.newTransformer(new StreamSource(xsltFile));
+
+            // Resulting SAX events (the generated FO) must be piped through to
+            // FOP
+            Result res = new SAXResult(fop.getDefaultHandler());
+
+            // Start XSLT transformation and FOP processing
+            // That's where the XML is first transformed to XSL-FO and then
+            // PDF is created
+            transformer.transform(xmlSource, res);
+        } finally {
+            out.close();
         }
     }
 }

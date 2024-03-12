@@ -22,7 +22,7 @@
     </dependencies>
 
     <build>
-        <finalName>Apache Fop Demo</finalName>
+        <finalName>RepteXML</finalName>
 
         <plugins>
             <plugin>
